@@ -1,0 +1,56 @@
+function sysCall_init()
+    sim.setThreadAutomaticSwitch(false)
+    jointAngle=0
+    jointHandle=sim.getObject('.')
+    corout=coroutine.create(coroutineMain)
+end
+
+function sysCall_actuation()
+    if coroutine.status(corout)~='dead' then
+        local ok,errorMsg=coroutine.resume(corout)
+        if errorMsg then
+            error(debug.traceback(corout,errorMsg),2)
+        end
+    end
+end
+
+function computeTargetVelocity(jointAngle,targetAngle)
+    local dynStepSize=0.005
+    local velUpperLimit=360*math.pi/180
+    local PID_P=0.1
+    local errorValue=targetAngle-jointAngle
+    local sinAngle=math.sin(errorValue)
+    local cosAngle=math.cos(errorValue)
+    errorValue=math.atan2(sinAngle,cosAngle)
+    local ctrl=errorValue*PID_P
+    
+    -- Calculate the velocity needed to reach the position in one dynamic time step:
+    local velocity=ctrl/dynStepSize
+    if velocity>velUpperLimit then
+        velocity=velUpperLimit
+    end
+        
+    if velocity<-velUpperLimit then
+        velocity=-velUpperLimit
+    end
+    
+    return velocity
+end
+
+function moveToAngle(targetAngle)
+    while math.abs(jointAngle-targetAngle)>0.1*math.pi/180 do
+        vel=computeTargetVelocity(jointAngle,targetAngle)
+        sim.setJointTargetForce(jointHandle,100)
+        sim.setJointTargetVelocity(jointHandle,vel)
+        sim.switchThread()
+        jointAngle=sim.getJointPosition(jointHandle)
+    end
+end
+
+function coroutineMain()
+    moveToAngle(45*math.pi/180)
+    moveToAngle(90*math.pi/180)
+    moveToAngle(-89*math.pi/180) --no -90, to avoid passing below
+    moveToAngle(0*math.pi/180)
+end
+

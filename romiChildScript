@@ -1,0 +1,84 @@
+-- Functions called by the ZeroMQ remote API client:
+----------------------------------------------------
+function remoteApi_movementDataFunction(movData)
+    allMovementData[movData.id]=movData
+end
+
+function remoteApi_executeMovement(movName)
+    movementToExecute[#movementToExecute+1]=movName
+end
+
+function applyJointTargetPositions(handles,vals)
+    for i=1,#handles,1 do
+        if sim.isDynamicallyEnabled(handles[i]) then
+            sim.setJointTargetPosition(handles[i],vals[i])
+        else    
+            sim.setJointPosition(handles[i],vals[i])
+        end
+    end
+end
+
+function movCallback(config,vel,accel,handles)
+    applyJointTargetPositions(handles,config)
+end
+
+function sysCall_init()
+    romiBase=sim.getObject('.') -- this is bubbleRob's handle
+    leftMotor=sim.getObject("./leftMotor") -- Handle of the left motor
+    rightMotor=sim.getObject("./rightMotor") -- Handle of the right motor
+    
+    minMaxSpeed={50*math.pi/180,300*math.pi/180} -- Min and max speeds for each motor
+    backUntilTime=-1 -- Tells whether bubbleRob is in forward or backward mode
+    robotCollection=sim.createCollection(0)
+    sim.addItemToCollection(robotCollection,sim.handle_tree,romiBase,0)
+
+    stringSignalName='/RomiBase_executedMovId'
+    movementToExecute={}
+    allMovementData={}
+    -- currentVel={0,0}
+    -- currentAccel={0,0}
+    -- maxJerk={100,100}
+    sim.setStringSignal(stringSignalName,'ready')
+    -- currentPosVelAccel={0,0,0,0,0,0}
+    
+    corout = coroutine.create(coroutineStart)
+end
+
+function computeTargetVelocity(volts)
+    local velocity
+    if     volts < 2.0 then velocity = 0
+    elseif volts < 3.0 then velocity = 0.5
+    elseif volts < 4.0 then velocity = 1.0
+    elseif volts < 5.0 then velocity = 2.0
+    elseif volts < 6.0 then velocity = 4.0
+    elseif volts < 7.0 then velocity = 5.0                
+    elseif volts < 8.0 then velocity = 7.0
+    else velocity = 8.0 end       
+    return velocity * 2
+end
+
+function coroutineStart()
+    while true do
+        if #movementToExecute>0 then
+            local id=table.remove(movementToExecute,1)
+            local movementData=allMovementData[id]
+            
+            local leftVel = computeTargetVelocity(movementData.leftVolts)
+            sim.setJointTargetVelocity(leftMotor,movementData.leftVolts)
+
+            local rightVel = computeTargetVelocity(movementData.rightVolts)
+            sim.setJointTargetVelocity(rightMotor,movementData.rightVolts)
+        else
+            sim.switchThread() -- in a coroutine will execute a yield instead
+        end
+    end
+end
+
+function sysCall_actuation()
+    if coroutine.status(corout)~='dead' then
+        local ok,errorMsg=coroutine.resume(corout)
+        if errorMsg then
+            error(debug.traceback(corout,errorMsg),2)
+        end
+    end
+end
