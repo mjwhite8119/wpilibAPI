@@ -36,7 +36,13 @@ NetworkTables.initialize(server=ip)
 # Setup constants
 X=0
 Y=1
-HEADING=0
+HEADING=2
+
+# Set-up some movement variables:
+leftVel = 0
+rightVel = 0
+wheelRadius = 0.035
+fieldOffset = 2.5 # CoppeliaSim field origin is in the center
 
 # Connect to CoppeliaSim
 client = RemoteAPIClient()
@@ -47,6 +53,8 @@ executedMovId = 'notReady'
 # Get the child script handle
 targetModel = '/RomiBase'
 romiBase = sim.getObject(targetModel)
+leftMotor = sim.getObject('/leftMotor')
+rightMotor = sim.getObject('/rightMotor')
 scriptHandle = sim.getScript(sim.scripttype_childscript,romiBase)
 
 stringSignalName = targetModel + '_executedMovId'
@@ -66,14 +74,28 @@ def getTrajectory():
     linear_vel, angular_vel = sim.getObjectVelocity(romiBase)
     return [linear_vel[0], linear_vel[1], angular_vel[0]]
 
-# Set-up some movement variables:
-leftVel = 0
-rightVel = 0
+# def getOdometry():
+#     result, leftWheel = sim.getObjectFloatParameter(leftMotor, sim.jointfloatparam_velocity)
+#     result, rightWheel = sim.getObjectFloatParameter(rightMotor, sim.jointfloatparam_velocity)
+#     delta_time = sim.getSimulationTimeStep()
+#     thetaL = leftWheel * wheelRadius
+#     thetaR = rightWheel * wheelRadius
+#     return thetaL, thetaR
+
+def getWheelSpeeds():
+    leftWheelSpeed = sim.getJointTargetVelocity(leftMotor) * wheelRadius
+    rightWheelSpeed = sim.getJointTargetVelocity(rightMotor) * wheelRadius
+    return leftWheelSpeed, rightWheelSpeed
+
+# def getWheelPositions():
+#     leftWheelPos = sim.getJointTargetPosition(leftMotor)
+#     rightWheelPos = sim.getJointTargetPosition(rightMotor)
+#     return leftWheelPos, rightWheelPos
 
 # Connect to Network Tables
-sd = NetworkTables.getTable("/Shuffleboard/Drivetrain")
-left_auto_value = sd.getAutoUpdateValue("Left Volts", 0)
-right_auto_value = sd.getAutoUpdateValue("Right Volts", 0)
+sb = NetworkTables.getTable("/Shuffleboard/Drivetrain")
+left_auto_value = sb.getAutoUpdateValue("Left Volts", 0)
+right_auto_value = sb.getAutoUpdateValue("Right Volts", 0)
 
 # Start simulation:
 sim.startSimulation()
@@ -84,12 +106,12 @@ waitForMovementExecuted('ready')
 while True:
     leftVolts = left_auto_value.value
     rightVolts = right_auto_value.value
-    if (leftVolts > 0.01 or rightVolts > 0.01):
-        print(leftVolts, ":", rightVolts)
+
+    # Setting to 15 represents 0.5 meters per/second
     movementData = {
         'id': 'drivetrain',
-        'leftVolts': 10,
-        'rightVolts': 10
+        'leftVolts': leftVolts * 3,
+        'rightVolts': rightVolts * 3
     }
     sim.callScriptFunction('remoteApi_movementDataFunction',scriptHandle,movementData)
 
@@ -100,8 +122,22 @@ while True:
     
     pose = getPose()
     trajectory = getTrajectory()
+    leftWheelSpeed, rightWheelSpeed = getWheelSpeeds()
+    # leftWheelPos, rightWheelPos = getWheelPositions()
+    # print(pose[X], pose[Y], simulation_time)
+    # odometry = getOdometry()
 
-    print(pose[X], trajectory[X], simulation_time)
+    # Update the Java program. Must have the model bounding box set as follows
+    # [Menu bar --> Edit --> Reorient bounding box --> With reference frame of world]
+    sb.putNumber("poseX", pose[X] + fieldOffset)
+    sb.putNumber("poseY", pose[Y] + fieldOffset)
+    sb.putNumber("heading", pose[HEADING])
+    sb.putNumber("leftWheelSpeed", leftWheelSpeed)
+    sb.putNumber("rightWheelSpeed", rightWheelSpeed)
+
+    if (leftVolts > 0.01 or rightVolts > 0.01):
+        print(leftVolts, rightVolts, pose[X], simulation_time)
+        # print(pose[X], simulation_time)
 
 # Wait until above movement sequence finished executing:
 waitForMovementExecuted('drivetrain')

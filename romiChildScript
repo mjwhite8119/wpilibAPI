@@ -35,26 +35,9 @@ function sysCall_init()
     stringSignalName='/RomiBase_executedMovId'
     movementToExecute={}
     allMovementData={}
-    -- currentVel={0,0}
-    -- currentAccel={0,0}
-    -- maxJerk={100,100}
     sim.setStringSignal(stringSignalName,'ready')
-    -- currentPosVelAccel={0,0,0,0,0,0}
     
     corout = coroutine.create(coroutineStart)
-end
-
-function computeTargetVelocity(volts)
-    local velocity
-    if     volts < 2.0 then velocity = 0
-    elseif volts < 3.0 then velocity = 0.5
-    elseif volts < 4.0 then velocity = 1.0
-    elseif volts < 5.0 then velocity = 2.0
-    elseif volts < 6.0 then velocity = 4.0
-    elseif volts < 7.0 then velocity = 5.0                
-    elseif volts < 8.0 then velocity = 7.0
-    else velocity = 8.0 end       
-    return velocity * 2
 end
 
 function coroutineStart()
