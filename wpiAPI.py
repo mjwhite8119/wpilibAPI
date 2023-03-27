@@ -54,7 +54,7 @@ executedMovId = 'notReady'
 targetModel = '/RomiBase'
 romiBase = sim.getObject(targetModel)
 leftMotor = sim.getObject('/leftMotor')
-rightMotor = sim.getObject('/rightMotor')
+# rightMotor = sim.getObject('/rightMotor')
 scriptHandle = sim.getScript(sim.scripttype_childscript,romiBase)
 
 stringSignalName = targetModel + '_executedMovId'
@@ -84,7 +84,8 @@ def getTrajectory():
 
 def getWheelSpeeds():
     leftWheelSpeed = sim.getJointTargetVelocity(leftMotor) * wheelRadius
-    rightWheelSpeed = sim.getJointTargetVelocity(rightMotor) * wheelRadius
+    # rightWheelSpeed = sim.getJointTargetVelocity(rightMotor) * wheelRadius
+    rightWheelSpeed = 0
     return leftWheelSpeed, rightWheelSpeed
 
 # def getWheelPositions():
@@ -104,14 +105,15 @@ sim.startSimulation()
 waitForMovementExecuted('ready')
 
 while True:
+    print("ready")
     leftVolts = left_auto_value.value
     rightVolts = right_auto_value.value
 
     # Setting to 15 represents 0.5 meters per/second
     movementData = {
         'id': 'drivetrain',
-        'leftVolts': leftVolts * 3,
-        'rightVolts': rightVolts * 3
+        'leftVolts': 3,
+        'rightVolts': 3
     }
     sim.callScriptFunction('remoteApi_movementDataFunction',scriptHandle,movementData)
 
@@ -136,7 +138,7 @@ while True:
     sb.putNumber("rightWheelSpeed", rightWheelSpeed)
 
     if (leftVolts > 0.01 or rightVolts > 0.01):
-        print(leftVolts, rightVolts, pose[X], simulation_time)
+        print(leftVolts, rightVolts, simulation_time)
         # print(pose[X], simulation_time)
 
 # Wait until above movement sequence finished executing:

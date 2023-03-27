@@ -46,10 +46,7 @@ function coroutineStart()
             local id=table.remove(movementToExecute,1)
             local movementData=allMovementData[id]
             
-            local leftVel = computeTargetVelocity(movementData.leftVolts)
             sim.setJointTargetVelocity(leftMotor,movementData.leftVolts)
-
-            local rightVel = computeTargetVelocity(movementData.rightVolts)
             sim.setJointTargetVelocity(rightMotor,movementData.rightVolts)
         else
             sim.switchThread() -- in a coroutine will execute a yield instead

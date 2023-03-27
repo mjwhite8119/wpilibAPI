@@ -1,0 +1,66 @@
+-- Functions called by the ZeroMQ remote API client:
+----------------------------------------------------
+function remoteApi_movementDataFunction(movData)
+    allMovementData[movData.id]=movData
+end
+
+function remoteApi_executeMovement(movName)
+    movementToExecute[#movementToExecute+1]=movName
+end
+
+function applyJointTargetPositions(handles,vals)
+    for i=1,#handles,1 do
+        if sim.isDynamicallyEnabled(handles[i]) then
+            sim.setJointTargetPosition(handles[i],vals[i])
+        else    
+            sim.setJointPosition(handles[i],vals[i])
+        end
+    end
+end
+
+function movCallback(config,vel,accel,handles)
+    applyJointTargetPositions(handles,config)
+end
+
+function sysCall_init()
+    targetModel = '/WheelBase'
+    wheelBase=sim.getObject('.') -- this is the wheel handle
+    leftMotor=sim.getObject("./leftMotor") -- Handle of the left motor
+    sim.setObjectFloatParam(leftMotor,)
+    -- rightMotor=sim.getObject("./rightMotor") -- Handle of the right motor
+    
+    minMaxSpeed={50*math.pi/180,300*math.pi/180} -- Min and max speeds for each motor
+    backUntilTime=-1 -- Tells whether bubbleRob is in forward or backward mode
+    robotCollection=sim.createCollection(0)
+    sim.addItemToCollection(robotCollection,sim.handle_tree,wheelBase,0)
+
+    stringSignalName=targetModel .. '_executedMovId'
+    movementToExecute={}
+    allMovementData={}
+    sim.setStringSignal(stringSignalName,'ready')
+    
+    corout = coroutine.create(coroutineStart)
+end
+
+function coroutineStart()
+    while true do
+        if #movementToExecute>0 then
+            local id=table.remove(movementToExecute,1)
+            local movementData=allMovementData[id]
+       
+            sim.setJointTargetVelocity(leftMotor,movementData.leftVolts)
+            -- sim.setJointTargetVelocity(rightMotor,movementData.rightVolts)
+        else
+            sim.switchThread() -- in a coroutine will execute a yield instead
+        end
+    end
+end
+
+function sysCall_actuation()
+    if coroutine.status(corout)~='dead' then
+        local ok,errorMsg=coroutine.resume(corout)
+        if errorMsg then
+            error(debug.traceback(corout,errorMsg),2)
+        end
+    end
+end
